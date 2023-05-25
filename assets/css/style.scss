@@ -1,0 +1,57 @@
+---
+---
+
+@import '{{ site.theme }}';
+
+/* append your custom style below */
+
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.6/dist/web/static/pretendard.css");
+
+#search-results a,
+h5,
+h4,
+h3,
+h2,
+h1 {
+  font-weight: 500;
+  font-family: Pretendard;
+}
+
+#sidebar #avatar {
+    box-shadow: var(--avatar-border-color) 0 0 0 0.5px;
+}
+
+#page-category a:hover,
+#page-tag a:hover,
+.post-tags .post-tag:hover,
+.post-tail-wrapper .license-wrapper>a:hover,
+#search-results a:hover,
+#topbar #breadcrumb a:hover,
+.post-content a:not(.img-link):hover,
+.post-meta a:not([class]):hover,
+#access-lastmod a:hover,
+footer a:hover {
+  color: #7FBCD2 !important;
+  border-bottom: 0px solid #7FBCD2;
+  transition: all 0.4s;
+}
+
+#topbar #breadcrumb {
+    font-family: Pretendard;
+    font-size: 0.9rem;
+}
+
+footer {
+    font-size: .75rem;
+    font-family: Pretendard;
+}
+
+@media(prefers-color-scheme: light) {
+    html:not([data-mode]),
+    html[data-mode=light] {
+        --link-color: #146C94;
+    }
+    html[data-mode=dark] {
+        --link-color: rgb(175, 211, 226);
+    }
+}
