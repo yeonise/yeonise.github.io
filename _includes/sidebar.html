@@ -47,7 +47,7 @@
   </ul>
   <!-- ul.nav.flex-column -->
 
-  <div class="sidebar-bottom d-flex flex-wrap  align-items-center w-100">
+  <div class="sidebar-bottom d-flex flex-wrap  align-items-center w-100" style="justify-content: space-evenly;">
     {% unless site.theme_mode %}
       <button class="mode-toggle btn" aria-label="Switch Mode">
         <i class="fas fa-adjust"></i>
@@ -60,7 +60,7 @@
 
     {% for entry in site.data.contact %}
       {% case entry.type %}
-        {% when 'github', 'twitter' %}
+        {% when 'github' %}
           {%- capture url -%}
             https://{{ entry.type }}.com/{{ site[entry.type].username }}
           {%- endcapture -%}
@@ -69,8 +69,6 @@
           {%- capture url -%}
             javascript:location.href = 'mailto:' + ['{{ email[0] }}','{{ email[1] }}'].join('@')
           {%- endcapture -%}
-        {% when 'rss' %}
-          {% assign url = '/feed.xml' | relative_url %}
         {% else %}
           {% assign url = entry.url %}
       {% endcase %}
