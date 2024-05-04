@@ -1,34 +1,19 @@
-<!-- The Footer -->
-
-<footer>
-  <div class="container px-lg-4">
-    <div class="d-flex justify-content-center align-items-center text-muted mx-md-3">
-      <p>
-        {%- capture _platform -%}
-          <a href="https://jekyllrb.com" target="_blank" rel="noopener">Jekyll</a>
-        {%- endcapture -%}
-
-        {%- capture _theme -%}
-          <a href="https://github.com/cotes2020/jekyll-theme-chirpy" target="_blank" rel="noopener">Chirpy</a>
-        {%- endcapture -%}
-
-        {{ site.data.locales[include.lang].meta | replace: ':PLATFORM', _platform | replace: ':THEME', _theme }}
-      </p>
-
-      <p>
-        {{- '©' }}
-        {{ 'now' | date: '%Y' }}
-        {{ site.social.name }}.
-        {% if site.data.locales[include.lang].copyright.brief %}
-          <span
-            data-bs-toggle="tooltip"
-            data-bs-placement="top"
-            title="{{ site.data.locales[include.lang].copyright.verbose }}"
-          >
-            {{- site.data.locales[include.lang].copyright.brief -}}
-          </span>
-        {% endif %}
-      </p>
-    </div>
-  </div>
+<footer class="bottom-footer">
+    <!-- <span class="mini-note">You've reached the end of the page. Good job!</span> -->
+    <!-- <nav class="sans">
+        <hr>
+        <p><label class="menu-icon" for="menu-btn">Menu</label></p>
+        <ul class="site-nav">
+            <li><a href="/">Home</a></li>
+            <li><a href="/blog">Blog</a></li>
+            <li><a href="/designs">Designs</a></li>
+            <li><a href="/about">About</a></li>
+            <li><a href="https://canisee.xyz" title="Confirm your vision functionality">[Can I See]</a></li>
+        </ul>
+    </nav> -->
+    <i>Theme 
+        <a href="https://knhash.in/jekyllBear" title="the art">jekyllBear</a> built and maintained by
+        <a href="https://knhash.in" title="the artist">knhash</a>
+    </i>
 </footer>
+
