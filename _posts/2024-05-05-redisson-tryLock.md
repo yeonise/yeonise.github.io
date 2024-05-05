@@ -137,7 +137,6 @@ Lock 획득에 실패하면 우선 `waitTime` 이 초과되었는지 확인한�
 <br />
 
 아직 `waitTime` 을 초과하지 않았다면 다음 단계를 진행한다.
-Lock을 획득할 수 있는
 
 ``` java
 current = System.currentTimeMillis();
