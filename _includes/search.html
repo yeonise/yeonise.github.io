@@ -19,7 +19,7 @@
     resultsContainer: document.getElementById("results-container"),
     searchResultTemplate: '<a href="{url}" title="{desc}"><p>{title}</p></a>',
     limit: 6,
-    noResultsText: "<p>No results found!</p>",
+    noResultsText: "<p>No results found</p>",
     json: "/search.json",
     templateMiddleware: function(prop, value, template) {
       if (prop === 'title') {

@@ -18,6 +18,9 @@ whitelist:
   - jekyll-redirect-from
 
 markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
 
 compress_html:
   clippings: all
