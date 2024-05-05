@@ -4,7 +4,7 @@
 title: yeon blog
 description: yeon blog
 # baseurl: "/jekyllBear" # the subpath of your site, e.g. /blog/
-url: "https://yeonise.github.io" # the base hostname & protocol for your site
+url: "https://knhash.in/jekyllBear" # the base hostname & protocol for your site
 # host: 0.0.0.0
 
 
@@ -64,3 +64,4 @@ links:
 
 # Add links for more focus here
 special_links:
+  "Search": https://duckduckgo.com
