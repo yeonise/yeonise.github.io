@@ -261,6 +261,8 @@ public class JobLoggerListener implements JobExecutionListener {
 > trMigration**Job** 하위에 trMigration**Step**이 존재한다.  
 > trMigration**Step** 하위에 trOrders**Reader**, trOrder**Processor**, trOrder**Writer**이 존재한다.
 
+(참고로 강의에서는 Accounts의 `@Id` 에 `@GeneratedValue(strategy = GenerationType.IDENTITY)` 를 적용했는데, trOrderWriter가 insert 작업을 총 데이터의 절반만 수행하는 문제가 발생했다. 제거하니 정상적으로 동작한다.)
+
 ``` java
 @Configuration
 @RequiredArgsConstructor
@@ -280,7 +282,10 @@ public class TrMigrationConfig {
   @Bean
   @JobScope
   public Step trMigrationStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager,
-    ItemReader<Orders> trOrdersReader, ItemProcessor<Orders, Accounts> trOrderProcessor, ItemWriter<Accounts> trOrderWriter) {
+    ItemReader<Orders> trOrdersReader,
+    ItemProcessor<Orders, Accounts> trOrderProcessor,
+    ItemWriter<Accounts> trOrderWriter) {
+      
     return new StepBuilder("trMigrationStep", jobRepository)
       .<Orders, Accounts>chunk(5, platformTransactionManager)
       .reader(trOrdersReader)
@@ -331,7 +336,7 @@ public class TrMigrationConfig {
 
 <img src="/assets/screenshot/0509-7.png" />
 
-데이터가 비어있던 accounts 테이블로 정상적으로 이관되었다.  
+비어있던 accounts 테이블로 orders의 데이터가 정상적으로 이관되었다.  
 
 <img src="/assets/screenshot/0509-8.png" />
 
@@ -352,6 +357,11 @@ public class TrMigrationConfig {
 <br />
 
 # 9. 스프링 스케줄링을 이용한 배치 작업 실행
+
+<br />
+
+> Spring Batch 5.0 버전으로 업데이트 하면서 기존 방식에서 변경된 부분이 많기 때문에 공식 문서를 참고하는 것이 가장 정확할 것 같다.  
+> 그리고 Spring Batch는 수백만 개의 대용량 데이터 일괄 처리 작업에 쓰인다는데 토이 프로젝트에서 적용할 일은 거의 없지 않을까 싶다.
 
 <br />
 
