@@ -2,7 +2,7 @@
 layout: post
 title: "Spring Batch"
 subtitle: Spring Batch 5.0 체험기
-date: 2024-05-09 09:00:00 +0900
+date: 2024-05-12 14:00:00 +0900
 tags: [server, spring]
 ---
 
