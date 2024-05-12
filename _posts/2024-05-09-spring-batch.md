@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Spring Batch"
-subtitle: 
+subtitle: Spring Batch 5.0 체험기
 date: 2024-05-09 09:00:00 +0900
 tags: [server, spring]
 ---
@@ -285,12 +285,12 @@ public class TrMigrationConfig {
     ItemReader<Orders> trOrdersReader,
     ItemProcessor<Orders, Accounts> trOrderProcessor,
     ItemWriter<Accounts> trOrderWriter) {
-      
+
     return new StepBuilder("trMigrationStep", jobRepository)
       .<Orders, Accounts>chunk(5, platformTransactionManager)
       .reader(trOrdersReader)
       .processor(trOrderProcessor)
-      .writer(trOrderWriter)  // chunk size 충족 시 write 수행
+      .writer(trOrderWriter)  // chunk size 충족 시 write 작업을 수행한다.
       .build();
   }
 
@@ -301,7 +301,7 @@ public class TrMigrationConfig {
       .name("trOrdersReader")
       .repository(ordersRepository)
       .methodName("findAll")
-      .pageSize(5)  // 읽는 데이터의 개수
+      .pageSize(5)  // 한 번에 읽는 데이터의 개수를 설정한다.
       .arguments(List.of())
       .sorts(Collections.singletonMap("id", Sort.Direction.DESC))
       .build();
@@ -313,7 +313,7 @@ public class TrMigrationConfig {
     return new ItemProcessor<Orders, Accounts>() {
       @Override
       public Accounts process(Orders item) throws Exception {
-        return new Accounts(item);  // 읽은 데이터를 처리
+        return new Accounts(item); 
       }
     };
   }
@@ -342,13 +342,313 @@ public class TrMigrationConfig {
 
 <br />
 
+# 6. 파일 읽고 쓰기
+
+`player.csv` 파일을 읽어서 `player-output.csv` 파일을 쓰는 예제이다.  
+
+`player.csv` 파일의 내용은 다음과 같다.  
+
+```
+ID,lastName,firstName,position,birthYear,debutYear
+AbduKa00,Abdul-Jabbar,Karim,rb,1974,1996
+AbduRa00,Abdullah,Rabih,rb,1975,1999
+AberWa00,Abercrombie,Walter,rb,1959,1982
+AbraDa00,Abramowicz,Danny,wr,1945,1967
+AdamBo00,Adams,Bob,te,1946,1969
+AdamCh00,Adams,Charlie,wr,1979,2003
+```
+
 <br />
 
-# 6. 파일 읽고 쓰기
+파일을 읽을 때 사용할 FieldSetMapper를 구현한다.  
+
+``` java
+public class PlayerFieldSetMapper implements FieldSetMapper<Player> {
+
+  public Player mapFieldSet(FieldSet fieldSet) {
+    Player player = new Player();
+
+    player.setID(fieldSet.readString(0));  // ID
+    player.setLastName(fieldSet.readString(1));  // lastName
+    player.setFirstName(fieldSet.readString(2));  // firstName
+    player.setPosition(fieldSet.readString(3));  // position
+    player.setBirthYear(fieldSet.readInt(4));  // birthYear
+    player.setDebutYear(fieldSet.readInt(5));  // debutYear
+
+    return player;
+  }
+
+}
+```
+
+<br />
+
+FlatFileItemReader와 FlatFileItemWriter를 이용하여 Step을 구현하고 Job을 등록한다.  
+
+``` java
+@Configuration
+public class FileReadWriteConfig {
+
+  @Bean
+  public Job fileReadWriteJob(JobRepository jobRepository, Step fileReadWriteStep) {
+    return new JobBuilder("fileReadWriteJob", jobRepository)
+      .incrementer(new RunIdIncrementer())
+      .start(fileReadWriteStep)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step fileReadWriteStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
+    ItemReader<Player> playerItemReader,
+    ItemProcessor<Player, PlayerYears> playerItemProcessor,
+    ItemWriter<PlayerYears> playerItemWriter) {
+
+    return new StepBuilder("fileReadWriteStep", jobRepository)
+      .<Player, PlayerYears>chunk(5, transactionManager)
+      .reader(playerItemReader)
+      .processor(playerItemProcessor)
+      .writer(playerItemWriter)
+      .build();
+  }
+
+  @Bean
+  @StepScope
+  public FlatFileItemReader<Player> playerItemReader() {
+    return new FlatFileItemReaderBuilder<Player>()
+      .name("playerItemReader")
+      .resource(new FileSystemResource("player.csv"))  // 읽어올 파일 설정
+      .lineTokenizer(new DelimitedLineTokenizer())  // comma로 구분
+      .fieldSetMapper(new PlayerFieldSetMapper())  // Mapper 적용
+      .linesToSkip(1)
+      .build();
+  }
+
+  @Bean
+  @StepScope
+  public ItemProcessor<Player, PlayerYears> playerItemProcessor() {
+    return new ItemProcessor<Player, PlayerYears>() {
+      @Override
+      public PlayerYears process(Player item) throws Exception {
+        return new PlayerYears(item);  // yearsExperience 필드가 추가된 객체로 가공
+      }
+    };
+  }
+
+  @Bean
+  @StepScope
+  public FlatFileItemWriter<PlayerYears> playerItemWriter() {
+    BeanWrapperFieldExtractor<PlayerYears> fieldExtractor = new BeanWrapperFieldExtractor<>();  // 어떤 필드를 사용할 것인가
+    fieldExtractor.setNames(new String[]{"ID", "lastName", "position", "yearsExperience"});
+    fieldExtractor.afterPropertiesSet();
+
+    DelimitedLineAggregator<PlayerYears> lineAggregator = new DelimitedLineAggregator<>();
+    lineAggregator.setDelimiter(",");  // 어떤 구분자를 사용할 것인가
+    lineAggregator.setFieldExtractor(fieldExtractor);  // 어떤 필드를 사용할 것인가
+
+    FileSystemResource outputResource = new FileSystemResource("player-output.csv");  // 결과물
+
+    return new FlatFileItemWriterBuilder<PlayerYears>()
+      .name("playerItemWriter")
+      .resource(outputResource)
+      .lineAggregator(lineAggregator)
+      .build();
+  }
+
+}
+```
+
+<br />
+
+애플리케이션을 실행하면 `player-output.csv` 파일이 생성된다. ( `--job.name=fileReadWriteJob` )  
+
+<img src="/assets/screenshot/0512-1.png" />
 
 <br />
 
 # 7. 여러 개의 Step을 이용한 실행 상태에 따른 분기 처리 
+
+지금까지는 하나의 Job에 하나의 Step을 사용해서 구현했다.  
+하나의 Job에 여러 개의 Step을 사용하는 방법은 다음과 같다.  
+
+``` java
+@Configuration
+public class MultiStepJobConfig {
+
+  @Bean
+  public Job multiStepJob(JobRepository jobRepository, Step step1, Step step2, Step step3) {
+    return new JobBuilder("multiStepJob", jobRepository)
+      .incrementer(new RunIdIncrementer())
+      .start(step1)  // 첫 번째 Step 시작
+      .next(step2)  // 이어서 두 번째 Step 실행
+      .next(step3)  // 마지막으로 세 번째 Step 실행
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step step1(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("step1", jobRepository)
+      .tasklet(((contribution, chunkContext) -> {
+        System.out.println("Step 1");
+
+        return RepeatStatus.FINISHED;
+      }), transactionManager)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step step2(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("step2", jobRepository)
+      .tasklet(((contribution, chunkContext) -> {  // chunk는 transaction의 단위이다.
+        System.out.println("Step 2");
+
+        ExecutionContext executionContext = chunkContext
+          .getStepContext()
+          .getStepExecution()
+          .getJobExecution()
+          .getExecutionContext();
+
+        executionContext.put("for next", "hello!");  
+
+        return RepeatStatus.FINISHED;
+      }), transactionManager)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step step3(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("step3", jobRepository)
+      .tasklet(((contribution, chunkContext) -> {
+        System.out.println("Step 3");
+
+        ExecutionContext executionContext = chunkContext
+          .getStepContext()
+          .getStepExecution()
+          .getJobExecution()
+          .getExecutionContext();
+
+        System.out.println(executionContext.get("for next"));  // Step 2에서 설정한 context를 Step 3에서 사용할 수 있다.
+
+        return RepeatStatus.FINISHED;
+      }), transactionManager)
+      .build();
+  }
+
+}
+```
+
+step1, step2, step3 순서대로 실행되며, step2에서 설정한 `hello!` 를 step3 단계에서 가져와서 출력하는 것을 확인할 수 있다. ( `--job.name=multiStepJob` )  
+
+<img src="/assets/screenshot/0512-4.png" />
+
+<br />
+
+또한 여러 개의 Step을 사용하여 분기 처리도 할 수 있다.  
+
+``` java
+@Configuration
+public class ConditionalStepJobConfig {
+
+  @Bean
+  public Job conditionalStepJob(JobRepository jobRepository,
+    Step conditionalStartStep,
+    Step allStep,
+    Step failedStep,
+    Step completedStep) {
+
+    return new JobBuilder("conditionalStepJob", jobRepository)
+      .incrementer(new RunIdIncrementer())
+      .start(conditionalStartStep)
+      .on("FAILED").to(failedStep)  // 실패한 경우
+      .from(conditionalStartStep)
+      .on("COMPLETED").to(completedStep)  // 성공한 경우
+      .from(conditionalStartStep)
+      .on("*").to(allStep)  // 그 외의 경우
+      .end()
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step conditionalStartStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("conditionalStartStep", jobRepository)
+      .tasklet(new Tasklet() {
+        @Override
+        public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+          System.out.println("start conditional step");
+
+          // throw new RuntimeException();
+          return RepeatStatus.FINISHED;
+        }
+      }, transactionManager)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step allStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("allStep", jobRepository)
+      .tasklet(new Tasklet() {
+        @Override
+        public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+          System.out.println("all Step (default)");
+
+          return RepeatStatus.FINISHED;
+        }
+      }, transactionManager)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step failedStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("failed Step", jobRepository)
+      .tasklet(new Tasklet() {
+        @Override
+        public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+          System.out.println("failed Step");
+
+          return RepeatStatus.FINISHED;
+        }
+      }, transactionManager)
+      .build();
+  }
+
+  @Bean
+  @JobScope
+  public Step completedStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+
+    return new StepBuilder("completedStep", jobRepository)
+      .tasklet(new Tasklet() {
+        @Override
+        public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+          System.out.println("completed Step");
+
+          return RepeatStatus.FINISHED;
+        }
+      }, transactionManager)
+      .build();
+  }
+
+}
+```
+
+애플리케이션을 정상적으로 실행하면 completedStep이 실행되는 것을 확인할 수 있다. ( `--job.name=conditionalStepJob` )  
+
+<img src="/assets/screenshot/0512-2.png" />
+
+예외가 발생하여 conditionalStartStep이 실패한 경우 failedStep이 실행된다. 
+
+<img src="/assets/screenshot/0512-3.png" />
 
 <br />
 
@@ -360,8 +660,9 @@ public class TrMigrationConfig {
 
 <br />
 
-> Spring Batch 5.0 버전으로 업데이트 하면서 기존 방식에서 변경된 부분이 많기 때문에 공식 문서를 참고하는 것이 가장 정확할 것 같다.  
-> 그리고 Spring Batch는 수백만 개의 대용량 데이터 일괄 처리 작업에 쓰인다는데 토이 프로젝트에서 적용할 일은 거의 없지 않을까 싶다.
+> - 수강한 강의는 Spring Boot 2.6.7, Spring Batch 4.x 버전을 사용했기 때문에 Spring Boot 3.x 이상, Spring Batch 5.x 이상의 프로젝트에서 제대로 동작하지 않는다.  
+> - Spring Batch 5.x 버전으로 업데이트 하면서 기존 방식에서 변경된 부분이 많기 때문에 공식 문서를 참고하는 것이 가장 정확할 것 같다.  
+> - 그리고 Spring Batch는 수백만 개의 대용량 데이터 일괄 처리 작업에 쓰인다는데 토이 프로젝트에서 적용할 일은 거의 없지 않을까 싶다.
 
 <br />
 
