@@ -263,6 +263,10 @@ public class JobLoggerListener implements JobExecutionListener {
 
 (참고로 강의에서는 Accounts의 `@Id` 에 `@GeneratedValue(strategy = GenerationType.IDENTITY)` 를 적용했는데, trOrderWriter가 insert 작업을 총 데이터의 절반만 수행하는 문제가 발생했다. 제거하니 정상적으로 동작한다.)
 
+<br />
+
+**trMigrationJob 구현 예시**
+
 ``` java
 @Configuration
 @RequiredArgsConstructor
@@ -362,6 +366,8 @@ AdamCh00,Adams,Charlie,wr,1979,2003
 
 파일을 읽을 때 사용할 FieldSetMapper를 구현한다.  
 
+**FieldSetMapper 구현 예시**
+
 ``` java
 public class PlayerFieldSetMapper implements FieldSetMapper<Player> {
 
@@ -384,6 +390,8 @@ public class PlayerFieldSetMapper implements FieldSetMapper<Player> {
 <br />
 
 FlatFileItemReader와 FlatFileItemWriter를 이용하여 Step을 구현하고 Job을 등록한다.  
+
+**fileReadWriteJob 구현 예시**
 
 ``` java
 @Configuration
@@ -471,6 +479,10 @@ public class FileReadWriteConfig {
 지금까지는 하나의 Job에 하나의 Step을 사용해서 구현했다.  
 하나의 Job에 여러 개의 Step을 사용하는 방법은 다음과 같다.  
 
+<br />
+
+**multiStepJob 구현 예시**
+
 ``` java
 @Configuration
 public class MultiStepJobConfig {
@@ -543,13 +555,17 @@ public class MultiStepJobConfig {
 }
 ```
 
-step1, step2, step3 순서대로 실행되며, step2에서 설정한 `hello!` 를 step3 단계에서 가져와서 출력하는 것을 확인할 수 있다. ( `--job.name=multiStepJob` )  
+<br />
+
+애플리케이션을 시작하면 step1, step2, step3 순서대로 실행되며, step2에서 설정한 `hello!` 를 step3 단계에서 가져와서 출력하는 것을 확인할 수 있다. ( `--job.name=multiStepJob` )  
 
 <img src="/assets/screenshot/0512-4.png" />
 
 <br />
 
 또한 여러 개의 Step을 사용하여 분기 처리도 할 수 있다.  
+
+**conditionalStepJob 구현 예시**
 
 ``` java
 @Configuration
@@ -642,6 +658,8 @@ public class ConditionalStepJobConfig {
 }
 ```
 
+<br />
+
 애플리케이션을 정상적으로 실행하면 completedStep이 실행되는 것을 확인할 수 있다. ( `--job.name=conditionalStepJob` )  
 
 <img src="/assets/screenshot/0512-2.png" />
@@ -654,9 +672,158 @@ public class ConditionalStepJobConfig {
 
 # 8. 테스트 코드 작성
 
+이제 간단한 테스트 코드를 작성해보자.  
+Batch 작업을 위한 설정 파일과 Job을 등록한 설정 파일을 사용하여 애플리케이션 컨텍스트를 구성하고 하나의 Job을 테스트하는 방법이다.  
+
+<br />
+
+test 패키지 내부에 Batch 작업을 위한 설정 파일을 생성한다.
+
+``` java
+@Configuration
+@EnableAutoConfiguration
+@EnableBatchProcessing
+public class SpringBatchTestConfig {
+}
+```
+
+<br />
+
+DB 데이터 이관 작업을 수행하는 trMigrationJob을 테스트하는 코드이다.  
+JobLauncherTestUtils을 이용하여 trMigrationJob을 `launch()` 할 수 있다.
+
+``` java
+@SpringBootTest(classes = {SpringBatchTestConfig.class, TrMigrationConfig.class})
+@SpringBatchTest
+class TrMigrationConfigTest {
+
+  @Autowired
+  private JobLauncherTestUtils jobLauncherTestUtils;
+
+  @Autowired
+  private OrdersRepository ordersRepository;
+
+  @Autowired
+  private AccountsRepository accountsRepository;
+
+  @BeforeEach
+  void clean() {
+    ordersRepository.deleteAllInBatch();
+    accountsRepository.deleteAllInBatch();
+  }
+
+  @Test
+  @DisplayName("orders 테이블에 데이터가 없으므로 accounts 테이블에 이관된 데이터는 없다")
+  void success_no_data() throws Exception {
+    // when
+    JobExecution jobExecution = jobLauncherTestUtils.launchJob();
+
+    // then
+    assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
+    assertThat(accountsRepository.count()).isEqualTo(0);
+  }
+
+  @Test
+  @DisplayName("orders 테이블의 모든 데이터가 accounts 테이블로 이관된다")
+  void success_has_data() throws Exception {
+    // given
+    Orders kakaoGift = new Orders(null, "kakao gift", 25000, new Date());
+    Orders naverGift = new Orders(null, "naver gift", 15000, new Date());
+
+    ordersRepository.save(kakaoGift);
+    ordersRepository.save(naverGift);
+
+    // when
+    JobExecution jobExecution = jobLauncherTestUtils.launchJob();
+
+    // then
+    assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
+    assertThat(accountsRepository.count()).isEqualTo(2);
+  }
+
+}
+```
+
+<br />
+
+테스트를 실행하면 통과되는 것을 확인할 수 있다.
+
+<img src="/assets/screenshot/0512-5.png" />
+
 <br />
 
 # 9. 스프링 스케줄링을 이용한 배치 작업 실행
+
+helloWorldJob을 스케줄링을 이용해서 1분마다 실행하는 예제이다.
+
+<br />
+
+우선 `application.yml` 에 `enabled: false` 설정을 추가한다.  
+
+``` yaml
+spring:
+  batch:
+    job:
+      name: ${job.name:NONE}  # job.name이 있으면 job.name 값을 할당하고, 없으면 NONE을 할당한다.
+      enabled: false  # job.name이 파라미터로 넘어와도 실행하지 않는다.
+```
+
+<br />
+
+기존의 HelloWorldJobConfig에 `@EnableScheduling` 을 추가한다.
+
+``` java
+@Configuration
+@EnableScheduling  // 추가
+public class HelloWorldJobConfig {
+
+  @Bean
+  public Job helloWorldJob(JobRepository jobRepository, Step helloWorldStep) {
+    return new JobBuilder("helloWorldJob", jobRepository)
+      .incrementer(new RunIdIncrementer())
+      .start(helloWorldStep)
+      .build();
+  }
+  ...
+```
+
+<br />
+
+스케줄링을 위한 컴포넌트를 생성한다.  
+
+**SimpleScheduler 구현 예시**
+``` java
+@Component
+public class SimpleScheduler {
+
+  @Autowired
+  private JobLauncher jobLauncher;
+
+  @Autowired
+  private Job helloWorldJob;
+
+  @Scheduled(cron = "0 */1 * * * *")  // second(0-59), minute(0-59), hour(0-23), day of the month(1-31), month(1-12), day of the week(0-7)
+  public void helloWorldJobRun() throws
+    JobInstanceAlreadyCompleteException,
+    JobExecutionAlreadyRunningException,
+    JobParametersInvalidException,
+    JobRestartException {
+
+    JobParameters jobParameters = new JobParametersBuilder()
+      .addLong("requestTime", System.currentTimeMillis())  // 1분마다 실행되는 각각의 Job을 구별하기 위한 파라미터
+      .toJobParameters();
+
+    jobLauncher.run(helloWorldJob, jobParameters);
+  }
+
+}
+```
+
+<br />
+
+애플리케이션을 실행하면 1분마다 "Hello World Spring batch"가 출력된다.
+
+<img src="/assets/screenshot/0512-6.png" />
 
 <br />
 
